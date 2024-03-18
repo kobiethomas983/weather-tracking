@@ -35,3 +35,21 @@ type CityInfo struct {
 	Lat float64 `json:"lat"`
 	Lon float64 `json:"long"`
 }
+
+type CurrentForecast struct {
+	Timezone string `json:"timezone"`
+	CurrentOverCast CurrentOverCast `json:"current"`
+}
+
+type CurrentOverCast struct {
+	Temp float64 `json:"temp"`
+	FeelsLike float64 `json:"feels_like"`
+	Clouds float64 `json:"clouds"`
+	WindSpeed float64 `json:"wind_speed"`
+	Weather []CurrentWeather `json:"weather"`
+}
+
+type CurrentWeather struct {
+	Main string `json:"main"`
+	Description string `json:"description"`
+}

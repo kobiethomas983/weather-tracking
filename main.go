@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ip2location/ip2location-go/v9"
 	"github.com/kobie/tracker/models"
 	"github.com/kobie/tracker/utils"
 )
@@ -55,6 +56,28 @@ func convertCityToCoordinate(city string) (float64, float64, error) {
 	cityCoordinate := coordinates[0]
 
 	return cityCoordinate.Lat, cityCoordinate.Lon, nil
+}
+
+func queryByCurrentLocation(lat float32, long float32) (*models.CurrentForecast, error) {
+	apiKey, err := loadEnv("api_config")
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://api.openweathermap.org/data/3.0/onecall?lat=%v&lon=%v&appid=%v", lat, long, apiKey.OpenWeatherMapKey)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var currentForecast *models.CurrentForecast
+	err = json.NewDecoder(resp.Body).Decode(&currentForecast)
+	if err != nil {
+		return nil, err
+	}
+
+	return currentForecast, nil
 }
 
 func queryForecastForUpcomingDays(city string) (*models.ForecastCollection, error) {
@@ -135,6 +158,7 @@ func main() {
 
 	http.HandleFunc("/forecast/", func(w http.ResponseWriter, r *http.Request) {
 		city := strings.SplitN(r.URL.Path, "/", 3)[2]
+		fmt.Println(r.RemoteAddr)
 		data, err := queryForecastForUpcomingDays(city)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -142,6 +166,24 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		json.NewEncoder(w).Encode(data)
+	})
+
+	http.HandleFunc("/get-current-weather", func(response http.ResponseWriter, request *http.Request) {
+		ipAddress := request.RemoteAddr
+		ipAddressDB := ip2location.DB{}
+
+		ipData, err := ipAddressDB.Get_latitude(ipAddress);
+		if err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+		}
+
+		data, err  := queryByCurrentLocation(ipData.Latitude, ipData.Longitude)
+		if err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+		}
+
+		response.Header().Set("Content-Type", "applicationn/json")
+		json.NewEncoder(response).Encode(data)
 	})
 
 	http.ListenAndServe(":8080", nil)
